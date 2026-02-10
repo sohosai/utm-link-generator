@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UTMリンク & QRコード生成</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #fff;
+  color: #222;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem;
+}
+
+h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 0.85rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+  color: #555;
+}
+
+.form-group label .req { color: #c00; }
+.form-group label .opt { color: #aaa; font-weight: 400; }
+
+.field-desc {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 0.3rem;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #333;
+}
+
+.custom-input {
+  margin-top: 0.3rem;
+  display: none;
+}
+
+.custom-input.show {
+  display: block;
+}
+
+.other-note {
+  display: none;
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 0.25rem;
+}
+
+.other-note.show {
+  display: block;
+}
+
+.btn {
+  padding: 0.55rem 1.2rem;
+  border: 1px solid #222;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #222;
+  color: #fff;
+  transition: opacity 0.15s;
+}
+
+.btn:hover { opacity: 0.8; }
+
+.btn-outline {
+  background: #fff;
+  color: #222;
+}
+
+.btn-generate {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+#result {
+  display: none;
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #eee;
+}
+
+#result h2 {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.generated-url {
+  background: #f7f7f7;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  padding: 0.6rem;
+  word-break: break-all;
+  font-size: 0.8rem;
+  color: #444;
+  margin-bottom: 0.75rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.qr-section { text-align: center; }
+
+#qrcode {
+  display: inline-block;
+  margin-bottom: 1rem;
+}
+
+#qrcode img, #qrcode canvas { display: block; }
+
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: #222;
+  color: #fff;
+  padding: 0.5rem 1.2rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  opacity: 0;
+  transition: transform 0.25s, opacity 0.25s;
+  pointer-events: none;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.error-msg {
+  color: #c00;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>UTMリンク & QRコード生成</h1>
+
+  <form id="utm-form" novalidate>
+    <div class="form-group">
+      <label>ベースURL <span class="req">*</span></label>
+      <input type="url" id="base-url" placeholder="https://example.com/page">
+    </div>
+
+    <div class="form-group">
+      <label>utm_source <span class="req">*</span></label>
+      <p class="field-desc">QRコードをどこに掲載するか</p>
+      <select id="utm-source" data-utm>
+        <option value="" disabled selected>選択してください</option>
+        <option value="pamphlet">パンフレット</option>
+        <option value="signboard">看板</option>
+        <option value="poster">ポスター</option>
+        <option value="__other__">その他</option>
+      </select>
+      <input type="text" class="custom-input" placeholder="例: banner（英数字で入力）" data-custom>
+      <p class="other-note">※ 選択肢の追加はGitHubで依頼してください。</p>
+    </div>
+
+    <div class="form-group">
+      <label>utm_medium <span class="req">*</span></label>
+      <p class="field-desc">どうやってアクセスさせるか</p>
+      <select id="utm-medium" data-utm>
+        <option value="" disabled selected>選択してください</option>
+        <option value="qr_code">QRコード</option>
+        <option value="print">印刷URL</option>
+        <option value="__other__">その他</option>
+      </select>
+      <input type="text" class="custom-input" placeholder="例: social（英数字で入力）" data-custom>
+      <p class="other-note">※ 選択肢の追加はGitHubで依頼してください。</p>
+    </div>
+
+    <div class="form-group">
+      <label>utm_campaign <span class="req">*</span></label>
+      <p class="field-desc">どのイベント・企画向けか</p>
+      <select id="utm-campaign" data-utm>
+        <option value="" disabled selected>選択してください</option>
+        <option value="sohosai26">雙峰祭</option>
+        <option value="open_campus26">オープンキャンパス</option>
+        <option value="welcome_new26">新歓</option>
+        <option value="__other__">その他</option>
+      </select>
+      <input type="text" class="custom-input" placeholder="例: event_name26（英数字で入力）" data-custom>
+      <p class="other-note">※ 選択肢の追加はGitHubで依頼してください。</p>
+    </div>
+
+    <p class="error-msg" id="error-msg"></p>
+    <button type="submit" class="btn btn-generate">生成</button>
+  </form>
+
+  <div id="result">
+    <h2>生成結果</h2>
+    <div class="generated-url" id="generated-url"></div>
+    <div class="actions">
+      <button class="btn btn-outline" id="copy-btn" type="button">URLをコピー</button>
+      <button class="btn" id="download-btn" type="button">QRをダウンロード</button>
+    </div>
+    <div class="qr-section">
+      <div id="qrcode"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  var form = document.getElementById('utm-form');
+  var baseUrlInput = document.getElementById('base-url');
+  var resultSection = document.getElementById('result');
+  var generatedUrlEl = document.getElementById('generated-url');
+  var copyBtn = document.getElementById('copy-btn');
+  var downloadBtn = document.getElementById('download-btn');
+  var qrcodeEl = document.getElementById('qrcode');
+  var errorMsg = document.getElementById('error-msg');
+  var toastEl = document.getElementById('toast');
+  var currentUrl = '';
+
+  document.querySelectorAll('select[data-utm]').forEach(function (sel) {
+    var customInput = sel.parentElement.querySelector('[data-custom]');
+    var note = sel.parentElement.querySelector('.other-note');
+    sel.addEventListener('change', function () {
+      if (sel.value === '__other__') {
+        customInput.classList.add('show');
+        if (note) note.classList.add('show');
+        customInput.focus();
+      } else {
+        customInput.classList.remove('show');
+        customInput.value = '';
+        if (note) note.classList.remove('show');
+      }
+    });
+  });
+
+  function getFieldValue(id) {
+    var sel = document.getElementById(id);
+    if (sel.value === '__other__') {
+      return sel.parentElement.querySelector('[data-custom]').value.trim();
+    }
+    return sel.value;
+  }
+
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.style.display = 'block';
+  }
+
+  function hideError() { errorMsg.style.display = 'none'; }
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    setTimeout(function () { toastEl.classList.remove('show'); }, 2000);
+  }
+
+  function isValidUrl(str) {
+    try { var u = new URL(str); return u.protocol === 'http:' || u.protocol === 'https:'; }
+    catch (_) { return false; }
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    hideError();
+
+    var baseUrl = baseUrlInput.value.trim();
+    var source = getFieldValue('utm-source');
+    var medium = getFieldValue('utm-medium');
+    var campaign = getFieldValue('utm-campaign');
+    if (!baseUrl) { showError('ベースURLを入力してください。'); return; }
+    if (!isValidUrl(baseUrl)) { showError('有効なURL（http:// または https://）を入力してください。'); return; }
+    if (!source || !medium || !campaign) { showError('utm_source、utm_medium、utm_campaign は必須です。'); return; }
+
+    var url = new URL(baseUrl);
+    url.searchParams.set('utm_source', source);
+    url.searchParams.set('utm_medium', medium);
+    url.searchParams.set('utm_campaign', campaign);
+
+    currentUrl = url.toString();
+    generatedUrlEl.textContent = currentUrl;
+
+    qrcodeEl.innerHTML = '';
+    new QRCode(qrcodeEl, { text: currentUrl, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+
+    resultSection.style.display = 'block';
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  copyBtn.addEventListener('click', function () {
+    if (!currentUrl) return;
+    navigator.clipboard.writeText(currentUrl).then(function () {
+      showToast('コピーしました');
+    }).catch(function () {
+      var ta = document.createElement('textarea');
+      ta.value = currentUrl;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('コピーしました');
+    });
+  });
+
+  downloadBtn.addEventListener('click', function () {
+    var canvas = qrcodeEl.querySelector('canvas');
+    if (!canvas) return;
+    var a = document.createElement('a');
+    a.download = 'qrcode.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  });
+})();
+</script>
+</body>
+</html>
